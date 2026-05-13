@@ -12,8 +12,8 @@
         .container { padding: 20px; max-width: 1200px; margin: auto; }
         
         /* Filtros */
-        .filter-section { background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; gap: 15px; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input[type="date"] { padding: 8px; border-radius: 5px; border: 1px solid #ccc; }
+        .filter-section { background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: center; justify-content: center; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        select, input[type="date"] { padding: 8px; border-radius: 5px; border: 1px solid #ccc; min-width: 150px; }
         button { padding: 8px 15px; background: var(--primary); color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
 
         .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
@@ -21,39 +21,43 @@
         .card p { margin: 10px 0 0; font-size: 24px; font-weight: bold; color: var(--primary); }
         
         .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-        .chart-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 300px; }
+        .chart-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); min-height: 350px; }
 
-        /* Tabela */
+        /* Tabela e Status */
         .table-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th { background: var(--primary); color: white; padding: 12px; text-align: left; }
-        td { padding: 10px; border-bottom: 1px solid #ddd; font-size: 14px; }
-        tr:hover { background: #f1f1f1; }
-        .pill { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: bold; }
-        .pill-ok { background: #d4edda; color: #155724; }
-        .pill-late { background: #f8d7da; color: #721c24; }
+        td { padding: 10px; border-bottom: 1px solid #ddd; font-size: 13px; }
+        
+        .status-pill { padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; }
+        .status-no-prazo { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .status-atrasado { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
     </style>
 </head>
 <body>
 
 <header>
     <h1>PAINEL DE CONTROLE DE COLETAS</h1>
-    <p>Monitoramento Logístico em Tempo Real</p>
+    <p>Monitoramento Logístico - Horse</p>
 </header>
 
 <div class="container">
-    <!-- FILTRO -->
     <div class="filter-section">
-        <label>Início:</label> <input type="date" id="dateStart">
-        <label>Fim:</label> <input type="date" id="dateEnd">
-        <button onclick="applyFilter()">Filtrar</button>
-        <button onclick="resetFilter()" style="background:#666">Limpar</button>
+        <div>
+            <label>Fornecedor:</label>
+            <select id="filterForn"><option value="todos">Todos os Fornecedores</option></select>
+        </div>
+        <div>
+            <label>De:</label> <input type="date" id="dateStart">
+            <label>Até:</label> <input type="date" id="dateEnd">
+        </div>
+        <button onclick="applyFilters()">Aplicar Filtros</button>
+        <button onclick="resetFilters()" style="background:#666">Limpar</button>
     </div>
 
     <div class="stats-grid">
         <div class="card"><h3>Total de Viagens</h3><p id="total-viagens">0</p></div>
-        <div class="card"><h3>No Prazo (%)</h3><p id="percentual-prazo">0%</p></div>
-        <div class="card"><h3>Fornecedor Top</h3><p id="forn-top">-</p></div>
+        <div class="card"><h3>Eficiência Geral</h3><p id="percentual-prazo">0%</p></div>
     </div>
 
     <div class="charts-grid">
@@ -61,15 +65,15 @@
         <div class="chart-container"><canvas id="chartPrazo"></canvas></div>
     </div>
 
-    <!-- TABELA -->
     <div class="table-container">
-        <h2>Listagem Geral de Viagens</h2>
-        <table id="viagensTable">
+        <h2>Detalhamento de Viagens</h2>
+        <table>
             <thead>
                 <tr>
                     <th>Data</th>
                     <th>Fornecedor</th>
-                    <th>Nº Viagem</th>
+                    <th>Rota</th>
+                    <th>Viagem</th>
                     <th>Status</th>
                 </tr>
             </thead>
@@ -80,96 +84,115 @@
 
 <script>
     const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSet_MSL2I0uUFX4Fwa_0WSIJAeOiyRC5eS_kXFGn0JEJqPKaIKPSPghTlSM0suGCZ_hZD-e_ZM-NEW/pub?gid=0&single=true&output=csv';
-    let allData = [];
-    let chart1, chart2;
+    let rawData = [];
+    let chartForn, chartPie;
 
-    async function loadData() {
+    async function fetchData() {
         try {
-            const response = await fetch(SHEET_URL);
-            const text = await response.text();
-            const rows = text.split('\n').map(r => r.trim()).filter(r => r.length > 0);
-            allData = rows.slice(1).map(row => row.split(','));
-            render(allData);
-        } catch (e) { console.error("Erro:", e); }
+            const res = await fetch(SHEET_URL);
+            const csv = await res.text();
+            const rows = csv.split('\n').map(r => r.trim()).filter(r => r.length > 0);
+            rawData = rows.slice(1).map(r => r.split(','));
+            
+            populateFornFilter();
+            renderDashboard(rawData);
+        } catch (e) { console.error("Erro na carga:", e); }
     }
 
-    function render(dataList) {
-        let countNoPrazo = 0;
-        let total = 0;
-        let fornecedores = {};
+    function populateFornFilter() {
+        const forns = [...new Set(rawData.map(cols => cols[3]?.replace(/"/g, '').trim()))].filter(f => f);
+        const select = document.getElementById('filterForn');
+        forns.sort().forEach(f => {
+            const opt = document.createElement('option');
+            opt.value = f; opt.innerText = f;
+            select.appendChild(opt);
+        });
+    }
+
+    function renderDashboard(dataList) {
+        let total = 0, noPrazo = 0;
+        let fornMap = {};
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = "";
 
         dataList.forEach(cols => {
             if (cols.length >= 10) {
                 total++;
-                const dataRaw = cols[0]; // A
-                const forn = cols[3]?.replace(/"/g, '') || "N/I"; // D
+                const data = cols[0]; // A
+                const forn = cols[3]?.replace(/"/g, '').trim() || "N/I"; // D
+                const rota = cols[4]; // E
                 const viagem = cols[6]; // G
-                const prazo = cols[9]?.replace(/"/g, '').trim(); // J
+                const prazo = cols[9]?.replace(/"/g, '').trim() || "ATRASADO"; // J
 
-                const isNoPrazo = prazo === "No Prazo";
-                if (isNoPrazo) countNoPrazo++;
-                fornecedores[forn] = (fornecedores[forn] || 0) + 1;
+                const ok = prazo.toUpperCase() === "NO PRAZO";
+                if (ok) noPrazo++;
+                fornMap[forn] = (fornMap[forn] || 0) + 1;
 
                 tbody.innerHTML += `<tr>
-                    <td>${dataRaw}</td>
+                    <td>${data}</td>
                     <td>${forn}</td>
+                    <td>${rota}</td>
                     <td>${viagem}</td>
-                    <td><span class="pill ${isNoPrazo ? 'pill-ok' : 'pill-late'}">${prazo}</span></td>
+                    <td><span class="status-pill ${ok ? 'status-no-prazo' : 'status-atrasado'}">${prazo}</span></td>
                 </tr>`;
             }
         });
 
         document.getElementById('total-viagens').innerText = total;
-        const perc = total > 0 ? ((countNoPrazo/total)*100).toFixed(1) : 0;
+        const perc = total > 0 ? ((noPrazo/total)*100).toFixed(1) : 0;
         document.getElementById('percentual-prazo').innerText = perc + "%";
-        
-        if (total > 0) {
-            const top = Object.keys(fornecedores).reduce((a, b) => fornecedores[a] > fornecedores[b] ? a : b);
-            document.getElementById('forn-top').innerText = top;
-            updateCharts(fornecedores, countNoPrazo, total);
-        }
+
+        updateCharts(fornMap, noPrazo, total);
     }
 
     function updateCharts(forns, ok, total) {
-        if (chart1) chart1.destroy();
-        if (chart2) chart2.destroy();
+        if (chartForn) chartForn.destroy();
+        if (chartPie) chartPie.destroy();
 
-        chart1 = new Chart(document.getElementById('chartFornecedor'), {
+        chartForn = new Chart(document.getElementById('chartFornecedor'), {
             type: 'bar',
-            data: { labels: Object.keys(forns), datasets: [{ label: 'Viagens por Fornecedor', data: Object.values(forns), backgroundColor: '#16213e' }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: { labels: Object.keys(forns), datasets: [{ label: 'Viagens', data: Object.values(forns), backgroundColor: '#16213e' }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Viagens por Fornecedor' } } }
         });
 
-        chart2 = new Chart(document.getElementById('chartPrazo'), {
+        const atrasado = total - ok;
+        chartPie = new Chart(document.getElementById('chartPrazo'), {
             type: 'pie',
-            data: { labels: ['No Prazo', 'Atrasado'], datasets: [{ data: [ok, total - ok], backgroundColor: ['#2ecc71', '#e63946'] }] },
-            options: { responsive: true, maintainAspectRatio: false }
+            data: { 
+                labels: [`No Prazo (${((ok/total)*100).toFixed(1)}%)`, `Atrasado (${((atrasado/total)*100).toFixed(1)}%)`], 
+                datasets: [{ data: [ok, atrasado], backgroundColor: ['#2ecc71', '#e63946'] }] 
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { title: { display: true, text: 'Pontualidade (%)' } } }
         });
     }
 
-    function applyFilter() {
+    function applyFilters() {
+        const fornSel = document.getElementById('filterForn').value;
         const start = document.getElementById('dateStart').value;
         const end = document.getElementById('dateEnd').value;
-        if (!start || !end) return alert("Defina o período!");
 
-        const filtered = allData.filter(cols => {
-            // Converte DD/MM/YYYY para YYYY-MM-DD para comparar
-            const parts = cols[0].split('/');
-            const d = `${parts[2]}-${parts[1]}-${parts[0]}`;
-            return d >= start && d <= end;
+        const filtered = rawData.filter(cols => {
+            const fMatch = fornSel === "todos" || cols[3]?.replace(/"/g, '').trim() === fornSel;
+            
+            let dMatch = true;
+            if (start && end) {
+                const parts = cols[0].split('/');
+                const d = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                dMatch = d >= start && d <= end;
+            }
+            return fMatch && dMatch;
         });
-        render(filtered);
+        renderDashboard(filtered);
     }
 
-    function resetFilter() {
+    function resetFilters() {
+        document.getElementById('filterForn').value = "todos";
         document.getElementById('dateStart').value = "";
         document.getElementById('dateEnd').value = "";
-        render(allData);
+        renderDashboard(rawData);
     }
 
-    loadData();
+    fetchData();
 </script>
 </body>
 </html>

@@ -86,35 +86,50 @@
 </div>
 
 <script>
-    // 1. COLOQUE O LINK DA SUA PLANILHA (CSV) AQUI
-    const SHEET_URL = '[https://docs.google.com/spreadsheets/d/e/2PACX-1vSet_MSL2I0uUFX4Fwa_0WSIJAeOiyRC5eS_kXFGn0JEJqPKaIKPSPghT1SM0suGCZ_hZD-e_ZM-NEW/pub?gid=0&single=true&output=csv](https://docs.google.com/spreadsheets/d/e/2PACX-1vSet_MSL2I0uUFX4Fwa_0WSIJAeOiyRC5eS_kXFGn0JEJqPKaIKPSPghT1SM0suGCZ_hZD-e_ZM-NEW/pub?gid=0&single=true&output=csv)';
+    // 1. LINK DA PLANILHA CORRIGIDO
+    const SHEET_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSet_MSL2I0uUFX4Fwa_0WSIJAeOiyRC5eS_kXFGn0JEJqPKaIKPSPghTlSM0suGCZ_hZD-e_ZM-NEW/pub?gid=0&single=true&output=csv';
 
     async function loadData() {
         try {
             const response = await fetch(SHEET_URL);
             const data = await response.text();
-            const rows = data.split('\n').slice(1); // Ignora o cabeçalho
+            
+            // Filtra linhas vazias e limpa espaços
+            const rows = data.split('\n').map(row => row.trim()).filter(row => row.length > 0);
+            const dataRows = rows.slice(1); // Ignora o cabeçalho
 
             let fornecedores = {};
             let prazos = { "No Prazo": 0, "Atrasado": 0 };
             let total = 0;
 
-            rows.forEach(row => {
+            dataRows.forEach(row => {
                 const cols = row.split(',');
-                if (cols.length < 5) return;
-
-                total++;
                 
-                // Mapeando Coluna D (Índice 3 - Fornecedor)
-                const forn = cols[3]?.trim();
-                if (forn) fornecedores[forn] = (fornecedores[forn] || 0) + 1;
+                // Verifica se a linha tem colunas suficientes
+                if (cols.length >= 11) {
+                    total++;
+                    
+                    // Coluna D (Índice 3) - Fornecedor
+                    const forn = cols[3].replace(/"/g, '').trim(); 
+                    if (forn) fornecedores[forn] = (fornecedores[forn] || 0) + 1;
 
-                // Mapeando Coluna K (Índice 10 - Prazo)
-                const status = cols[10]?.trim();
-                if (status === "No Prazo") prazos["No Prazo"]++;
-                else prazos["Atrasado"]++;
+                    // Coluna K (Índice 10) - Prazo
+                    const status = cols[10].replace(/"/g, '').trim();
+                    if (status === "No Prazo") {
+                        prazos["No Prazo"]++;
+                    } else {
+                        prazos["Atrasado"]++;
+                    }
+                }
             });
 
+            if (total > 0) {
+                updateDashboard(total, fornecedores, prazos);
+            }
+        } catch (error) {
+            console.error("Erro ao carregar dados:", error);
+        }
+    }
             updateDashboard(total, fornecedores, prazos);
         } catch (error) {
             console.error("Erro ao carregar dados:", error);

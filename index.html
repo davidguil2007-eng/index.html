@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Logístico Horse - Final Pro</title>
+    <title>Dashboard Logístico Horse - Correção de Porcentagem</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a1a2e; --bg: #f4f7f6; --gray-status: #808080; --red-status: #e63946; }
@@ -37,7 +37,7 @@
 </head>
 <body>
 
-<header><h1>DASHBOARD LOGÍSTICO HORSE</h1></header>
+<header><h1>PAINEL DE CONTROLE DE COLETAS</h1></header>
 
 <div class="container">
     <div class="filter-card">
@@ -96,7 +96,6 @@
     let barChartInstance = null;
     let pieChartInstance = null;
 
-    // Normalização completa de strings de data ("30-Apr", "14/05/2026", etc.)
     function parseAnyDate(dateStr) {
         if (!dateStr) return null;
         
@@ -138,131 +137,11 @@
 
             processData();
         } catch (e) {
-            console.error("Erro ao carregar dados da planilha:", e);
+            console.error("Erro ao carregar dados:", e);
         }
     }
 
     function processData() {
         const selForn = document.getElementById('fornSelect').value;
         const selStatus = document.getElementById('statusSelect').value;
-        const dStart = document.getElementById('dtStart').value;
-        const dEnd = document.getElementById('dtEnd').value;
-
-        let stats = { dentro: 0, fora: 0 };
-        let barMap = {};
-        const tbody = document.getElementById('tableBody');
-        tbody.innerHTML = "";
-
-        rawData.forEach(row => {
-            const matchForn = selForn === "ALL" || row.forn === selForn;
-            
-            let matchDate = true;
-            if (dStart && dEnd && row.dataIso) {
-                matchDate = (row.dataIso >= dStart && row.dataIso <= dEnd);
-            }
-
-            if (matchForn && matchDate) {
-                const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO");
-                const isFora = row.status.includes("FORA") || row.status.includes("ATRASADO");
-
-                if (isDentro || isFora) {
-                    // Validação lógica do filtro de status selecionado
-                    const passStatus = (selStatus === "AMBOS") || 
-                                       (selStatus === "DENTRO" && isDentro) || 
-                                       (selStatus === "FORA" && isFora);
-
-                    if (passStatus) {
-                        if (isDentro) stats.dentro++;
-                        if (isFora) stats.fora++;
-
-                        // Se filtrar fornecedor específico, agrupa barras por Data, senão agrupa por Fornecedor
-                        const label = selForn === "ALL" ? row.forn : row.dataOriginal;
-                        barMap[label] = (barMap[label] || 0) + 1;
-
-                        tbody.innerHTML += `<tr>
-                            <td>${row.dataOriginal}</td>
-                            <td>${row.forn}</td>
-                            <td>${row.rota}</td>
-                            <td>${row.viagem}</td>
-                            <td><span class="badge ${isDentro ? 'bg-dentro' : 'bg-fora'}">${row.status}</span></td>
-                        </tr>`;
-                    }
-                }
-            }
-        });
-
-        updateUI(barMap, stats, selStatus);
-    }
-
-    function updateUI(barMap, stats, filterMode) {
-        const total = stats.dentro + stats.fora;
-        document.getElementById('kpiTotal').innerText = total;
-
-        // Cálculo dinâmico e real da Eficiência com base no filtro
-        let efVal = 0;
-        if (total > 0) {
-            if (filterMode === "FORA") efVal = 0;
-            else if (filterMode === "DENTRO") efVal = 100;
-            else efVal = (stats.dentro / total) * 100;
-        }
-        document.getElementById('kpiEficiencia').innerText = efVal.toFixed(1) + "%";
-
-        // Destrói instâncias anteriores para evitar gráficos travados/duplicados
-        if (barChartInstance) barChartInstance.destroy();
-        if (pieChartInstance) pieChartInstance.instance?.destroy();
-
-        // Configuração de cor dinâmica para as barras baseada no filtro selecionado
-        let barColor = '#1a1a2e';
-        if (filterMode === "DENTRO") barColor = '#808080';
-        if (filterMode === "FORA") barColor = '#e63946';
-
-        // Renderiza Gráfico de Barras
-        const ctxBar = document.getElementById('barChart').getContext('2d');
-        barChartInstance = new Chart(ctxBar, {
-            type: 'bar',
-            data: {
-                labels: Object.keys(barMap),
-                datasets: [{
-                    label: 'Volume de Viagens',
-                    data: Object.values(barMap),
-                    backgroundColor: barColor
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-
-        // Renderiza Gráfico de Pizza (Dinâmico)
-        const ctxPie = document.getElementById('pieChart').getContext('2d');
-        
-        let pieLabels = [];
-        let pieData = [];
-        let pieColors = [];
-
-        if (filterMode === "AMBOS" || filterMode === "DENTRO") {
-            pieLabels.push(`Dentro (${stats.dentro})`);
-            pieData.push(stats.dentro);
-            pieColors.push('#808080');
-        }
-        if (filterMode === "AMBOS" || filterMode === "FORA") {
-            pieLabels.push(`Fora (${stats.fora})`);
-            pieData.push(stats.fora);
-            pieColors.push('#e63946');
-        }
-
-        pieChartInstance = new Chart(ctxPie, {
-            type: 'pie',
-            data: {
-                labels: pieLabels,
-                datasets: [{
-                    data: pieData,
-                    backgroundColor: pieColors
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    }
-
-    init();
-</script>
-</body>
-</html>
+        const dStart = document.getElementById('dtStart').

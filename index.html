@@ -63,8 +63,8 @@
             <label>Status Pontualidade</label>
             <select id="statusSelect">
                 <option value="AMBOS">DENTRO + FORA</option>
-                <option value="DENTRO">SOMENTE DENTRO</option>
-                <option value="FORA">SOMENTE FORA</option>
+                <option value="DENTRO">SOMENTE DENTRO DO PRAZO</option>
+                <option value="FORA">SOMENTE FORA DO PRAZO</option>
             </select>
         </div>
         <button onclick="processData()">ATUALIZAR FILTROS</button>
@@ -159,7 +159,7 @@
         tbody.innerHTML = "";
 
         rawData.forEach(row => {
-            // REMOVE COMPLETAMENTE O ANTECIPADO DO SISTEMA
+            // Ignora completamente qualquer registro com status Antecipado
             if (row.status.includes("ANTECIPADO")) {
                 return; 
             }
@@ -172,8 +172,9 @@
             }
 
             if (matchForn && matchDate) {
-                const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO");
-                const isFora = row.status.includes("FORA") || row.status.includes("ATRASADO");
+                // Mapeamento correto dos textos reais retornados pela planilha
+                const isDentro = row.status.includes("DENTRO DO PRAZO") || row.status.includes("NO PRAZO") || row.status === "DENTRO";
+                const isFora = row.status.includes("FORA DO PRAZO") || row.status.includes("ATRASADO") || row.status === "FORA";
 
                 if (isDentro || isFora) {
                     const passStatus = (selStatus === "AMBOS") || 
@@ -235,6 +236,7 @@
             options: { responsive: true, maintainAspectRatio: false }
         });
 
+        // Configuração estrita do gráfico de pizza para renderizar o Fora do Prazo sempre em VERMELHO
         const ctxPie = document.getElementById('pieChart').getContext('2d');
         let pieLabels = [];
         let pieData = [];
@@ -245,7 +247,7 @@
                 const pctDen = totalFiltro > 0 ? ((stats.dentro / totalFiltro) * 100).toFixed(1) : 0;
                 pieLabels.push(`Dentro do Prazo: ${stats.dentro} (${pctDen}%)`);
                 pieData.push(stats.dentro);
-                pieColors.push('#808080');
+                pieColors.push('#808080'); // Cinza fixo para Dentro do Prazo
             }
         }
         if (filterMode === "AMBOS" || filterMode === "FORA") {
@@ -253,7 +255,7 @@
                 const pctFora = totalFiltro > 0 ? ((stats.fora / totalFiltro) * 100).toFixed(1) : 0;
                 pieLabels.push(`Fora do Prazo: ${stats.fora} (${pctFora}%)`);
                 pieData.push(stats.fora);
-                pieColors.push('#e63946');
+                pieColors.push('#e63946'); // Vermelho estrito para Fora do Prazo
             }
         }
 

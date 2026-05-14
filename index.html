@@ -102,12 +102,6 @@
     let barChartInstance = null;
     let pieChartInstance = null;
 
-    // Função auxiliar para dividir a linha do CSV respeitando aspas e vírgulas internas
-    function splitCSVLine(line) {
-        const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
-        return matches.map(val => val.replace(/^"|"$////g, '').trim());
-    }
-
     function parseAnyDate(dateStr) {
         if (!dateStr) return null;
         if (dateStr.includes('/')) {
@@ -131,7 +125,7 @@
             const rows = csv.split('\n').slice(1);
             
             rawData = rows.map(r => {
-                // Usa a nova função de divisão robusta
+                // Divisão robusta para ignorar vírgulas dentro de aspas (nomes de fornecedores)
                 const c = r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
                 
                 return {
@@ -152,7 +146,6 @@
             processData();
         } catch (e) {
             console.error("Erro no carregamento:", e);
-            alert("Erro ao ler os dados. Se as tabelas continuarem sumidas, verifique se a planilha está publicada na Web em Arquivo > Compartilhar > Publicar na Web.");
         }
     }
 
@@ -168,8 +161,6 @@
         tbody.innerHTML = "";
 
         rawData.forEach(row => {
-            if (row.status.includes("ANTECIPADO")) return; 
-
             const matchForn = selForn === "ALL" || row.forn === selForn;
             let matchDate = true;
             if (dStart && dEnd && row.dataIso) {
@@ -177,7 +168,8 @@
             }
 
             if (matchForn && matchDate) {
-                const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO");
+                // Nova Regra: ANTECIPADO agora faz parte do grupo DENTRO DO PRAZO
+                const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO") || row.status.includes("ANTECIPADO");
                 const isFora = row.status.includes("FORA") || row.status.includes("ATRASADO");
 
                 if (isDentro || isFora) {
@@ -235,7 +227,7 @@
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'Dentro do Prazo', data: dataDentro, backgroundColor: '#808080' },
+                    { label: 'Dentro do Prazo / Antecipado', data: dataDentro, backgroundColor: '#808080' },
                     { label: 'Fora do Prazo', data: dataFora, backgroundColor: '#e63946' }
                 ]
             },
@@ -252,7 +244,7 @@
         if (filterMode === "AMBOS" || filterMode === "DENTRO") {
             if(stats.dentro > 0 || filterMode === "DENTRO") {
                 const pctDen = totalFiltro > 0 ? ((stats.dentro / totalFiltro) * 100).toFixed(1) : 0;
-                pieLabels.push(`Dentro do Prazo: ${stats.dentro} (${pctDen}%)`);
+                pieLabels.push(`Dentro do Prazo / Antecipado: ${stats.dentro} (${pctDen}%)`);
                 pieData.push(stats.dentro);
                 pieColors.push('#808080'); 
             }

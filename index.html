@@ -9,43 +9,36 @@
         :root { --primary: #1a1a2e; --bg: #f4f7f6; --gray-status: #808080; --red-status: #e63946; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; }
         
-        /* Cabeçalho corrigido com posicionamento relativo */
+        /* Cabeçalho com posicionamento relativo para isolar o botão na ponta */
         header { 
             background: var(--primary); 
             color: white; 
-            padding: 1.5rem 2rem; 
-            text-align: left; /* Garante o alinhamento padrão dos títulos na esquerda */
-            position: relative; /* Permite fixar o botão na ponta direita */
+            padding: 2rem; 
+            text-align: left;
+            position: relative; 
         }
-        header h1 { margin: 0; font-size: 24px; letter-spacing: 1px; text-transform: uppercase; }
-        header p { margin: 5px 0 0; font-size: 14px; opacity: 0.8; }
+        header h1 { margin: 0; font-size: 24px; letter-spacing: 1px; text-transform: uppercase; font-weight: 700; }
+        header p { margin: 6px 0 0; font-size: 14px; opacity: 0.8; }
         
-        /* Botão 100% fixado no canto superior direito */
+        /* Botão disfarçado TOTALMENTE na ponta superior direita */
         .btn-header-refresh {
             position: absolute;
-            top: 50%;
-            right: 25px;
-            transform: translateY(-50%); /* Centraliza o botão verticalmente no header */
-            background: var(--primary);
-            color: rgba(255, 255, 255, 0.7); /* Letras brancas disfarçadas */
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 6px;
+            top: 20px;
+            right: 20px;
+            background: var(--primary); /* Mesma cor do fundo */
+            color: rgba(255, 255, 255, 0.4); /* Letras brancas bem disfarçadas/discretas */
+            border: none; /* Sem borda para sumir no fundo */
+            border-radius: 4px;
             cursor: pointer;
-            font-weight: 600;
-            height: 34px;
-            padding: 0 15px;
+            font-weight: 500;
+            padding: 5px 10px;
             font-size: 11px;
             text-transform: uppercase;
             transition: all 0.2s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            white-space: nowrap;
         }
         .btn-header-refresh:hover {
+            color: rgba(255, 255, 255, 1); /* Clarea ao passar o mouse */
             background: #252542;
-            color: rgba(255, 255, 255, 1);
-            border-color: rgba(255, 255, 255, 0.5);
         }
 
         .container { padding: 20px; max-width: 1300px; margin: auto; }
@@ -85,7 +78,7 @@
     <p>Monitoramento Logístico em Tempo Real</p>
     
     <button class="btn-header-refresh" id="btnAtualizarPlanilha" onclick="init()">
-        🔄 Atualizar
+        atualizar
     </button>
 </header>
 
@@ -181,7 +174,7 @@
         const valorOriginalForn = document.getElementById('fornSelect').value;
         
         try {
-            btn.innerText = "⏳ AGUARDE...";
+            btn.innerText = "...⏳";
             btn.disabled = true;
 
             const res = await fetch(`${URL}&timestamp=${new Date().getTime()}`);
@@ -223,7 +216,7 @@
         } catch (e) {
             console.error("Erro no carregamento:", e);
         } finally {
-            btn.innerText = "🔄 Atualizar";
+            btn.innerText = "atualizar";
             btn.disabled = false;
         }
     }

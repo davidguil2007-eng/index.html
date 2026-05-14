@@ -159,7 +159,6 @@
         tbody.innerHTML = "";
 
         rawData.forEach(row => {
-            // Ignora completamente qualquer registro com status Antecipado
             if (row.status.includes("ANTECIPADO")) {
                 return; 
             }
@@ -172,7 +171,6 @@
             }
 
             if (matchForn && matchDate) {
-                // Mapeamento correto dos textos reais retornados pela planilha
                 const isDentro = row.status.includes("DENTRO DO PRAZO") || row.status.includes("NO PRAZO") || row.status === "DENTRO";
                 const isFora = row.status.includes("FORA DO PRAZO") || row.status.includes("ATRASADO") || row.status === "FORA";
 
@@ -186,7 +184,13 @@
                         if (isFora) stats.fora++;
 
                         const label = selForn === "ALL" ? row.forn : row.dataOriginal;
-                        barMap[label] = (barMap[label] || 0) + 1;
+                        
+                        // Inicializa a estrutura para permitir a separação de cores na barra
+                        if (!barMap[label]) {
+                            barMap[label] = { dentro: 0, fora: 0 };
+                        }
+                        if (isDentro) barMap[label].dentro++;
+                        if (isFora) barMap[label].fora++;
 
                         tbody.innerHTML += `<tr>
                             <td>${row.dataOriginal}</td>
@@ -218,25 +222,40 @@
         if (barChartInstance) barChartInstance.destroy();
         if (pieChartInstance) pieChartInstance.destroy();
 
-        let barColor = '#1a1a2e';
-        if (filterMode === "DENTRO") barColor = '#808080';
-        if (filterMode === "FORA") barColor = '#e63946';
-
+        // Configuração do Gráfico de Barras Empilhado com cores sincronizadas com a Pizza
         const ctxBar = document.getElementById('barChart').getContext('2d');
+        const labels = Object.keys(barMap);
+        const dataDentro = labels.map(l => barMap[l].dentro);
+        const dataFora = labels.map(l => barMap[l].fora);
+
         barChartInstance = new Chart(ctxBar, {
             type: 'bar',
             data: {
-                labels: Object.keys(barMap),
-                datasets: [{
-                    label: 'Volume de Viagens',
-                    data: Object.values(barMap),
-                    backgroundColor: barColor
-                }]
+                labels: labels,
+                datasets: [
+                    {
+                        label: 'Dentro do Prazo',
+                        data: dataDentro,
+                        backgroundColor: '#808080' // Cinza
+                    },
+                    {
+                        label: 'Fora do Prazo',
+                        data: dataFora,
+                        backgroundColor: '#e63946' // Vermelho
+                    }
+                ]
             },
-            options: { responsive: true, maintainAspectRatio: false }
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false,
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
+                }
+            }
         });
 
-        // Configuração estrita do gráfico de pizza para renderizar o Fora do Prazo sempre em VERMELHO
+        // Configuração estrita do gráfico de pizza
         const ctxPie = document.getElementById('pieChart').getContext('2d');
         let pieLabels = [];
         let pieData = [];
@@ -247,7 +266,7 @@
                 const pctDen = totalFiltro > 0 ? ((stats.dentro / totalFiltro) * 100).toFixed(1) : 0;
                 pieLabels.push(`Dentro do Prazo: ${stats.dentro} (${pctDen}%)`);
                 pieData.push(stats.dentro);
-                pieColors.push('#808080'); // Cinza fixo para Dentro do Prazo
+                pieColors.push('#808080'); 
             }
         }
         if (filterMode === "AMBOS" || filterMode === "FORA") {
@@ -255,7 +274,7 @@
                 const pctFora = totalFiltro > 0 ? ((stats.fora / totalFiltro) * 100).toFixed(1) : 0;
                 pieLabels.push(`Fora do Prazo: ${stats.fora} (${pctFora}%)`);
                 pieData.push(stats.fora);
-                pieColors.push('#e63946'); // Vermelho estrito para Fora do Prazo
+                pieColors.push('#e63946'); 
             }
         }
 

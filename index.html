@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Logístico - Foco em Pontualidade</title>
+    <title>Dashboard Horse - Pontualidade</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a1a2e; --secondary: #16213e; --bg: #f0f2f5; }
@@ -30,7 +30,7 @@
         .status-pill { padding: 5px 12px; border-radius: 15px; font-weight: bold; font-size: 11px; text-transform: uppercase; display: inline-block; color: white; }
         .status-dentro { background-color: #808080; } /* Cinza */
         .status-fora { background-color: #e63946; }   /* Vermelho */
-        .status-outro { background-color: #ddd; color: #666; } 
+        .status-ignorar { background-color: #f1f1f1; color: #999; }
     </style>
 </head>
 <body>
@@ -55,7 +55,7 @@
     </div>
 
     <div class="stats-grid">
-        <div class="card"><h3>Total de Viagens (Filtro)</h3><p id="total-viagens">0</p></div>
+        <div class="card"><h3>Total Analisado</h3><p id="total-valido">0</p></div>
         <div class="card"><h3>Eficiência (No Prazo)</h3><p id="percentual-prazo">0%</p></div>
     </div>
 
@@ -66,7 +66,7 @@
 
     <div class="table-container">
         <h2>Detalhamento de Viagens</h2>
-        <table>
+        <table id="mainTable">
             <thead>
                 <tr>
                     <th>Data</th>
@@ -92,10 +92,9 @@
             const csv = await res.text();
             const rows = csv.split('\n').map(r => r.trim()).filter(r => r.length > 0);
             rawData = rows.slice(1).map(r => r.split(','));
-            
             populateFornFilter();
             applyFilters();
-        } catch (e) { console.error("Erro:", e); }
+        } catch (e) { console.error("Erro ao carregar dados:", e); }
     }
 
     function populateFornFilter() {
@@ -124,7 +123,6 @@
             }
             return fMatch && dMatch;
         });
-
         updateDashboard(filtered, fornSel);
     }
 
@@ -141,20 +139,24 @@
             const viagem = cols[6];
             const prazoRaw = cols[9]?.replace(/"/g, '').trim().toUpperCase() || "";
 
-            let cssClass = "status-outro";
-            
-            // CONTA APENAS DENTRO OU FORA DO PRAZO
+            let cssClass = "status-ignorar";
+            let ehValido = false;
+
+            // Filtro estrito: Apenas "Dentro" e "Fora"
             if (prazoRaw.includes("DENTRO DO PRAZO") || prazoRaw.includes("NO PRAZO")) { 
                 stats.dentro++; 
                 stats.totalValido++;
-                cssClass = "status-dentro"; 
+                cssClass = "status-dentro";
+                ehValido = true;
             } 
             else if (prazoRaw.includes("FORA DO PRAZO") || prazoRaw.includes("ATRASADO")) { 
                 stats.fora++; 
                 stats.totalValido++;
-                cssClass = "status-fora"; 
+                cssClass = "status-fora";
+                ehValido = true;
             }
 
+            // O gráfico de barras mostra a quantidade por fornecedor ou data independente do status
             const labelBar = fornSel === "todos" ? forn : dataV;
             barData[labelBar] = (barData[labelBar] || 0) + 1;
 
@@ -167,8 +169,7 @@
             </tr>`;
         });
 
-        document.getElementById('total-viagens').innerText = data.length;
-        // Cálculo da eficiência considerando apenas os dois status
+        document.getElementById('total-valido').innerText = stats.totalValido;
         const efici = stats.totalValido > 0 ? ((stats.dentro / stats.totalValido) * 100).toFixed(1) : 0;
         document.getElementById('percentual-prazo').innerText = efici + "%";
 
@@ -182,8 +183,8 @@
         chartBar = new Chart(document.getElementById('chartDinamico'), {
             type: 'bar',
             data: {
-                labels: Object.keys(barBarData = barData),
-                datasets: [{ label: 'Quantidade', data: Object.values(barData), backgroundColor: '#16213e' }]
+                labels: Object.keys(barData),
+                datasets: [{ label: 'Qtd Viagens', data: Object.values(barData), backgroundColor: '#16213e' }]
             },
             options: { responsive: true, maintainAspectRatio: false }
         });
@@ -192,8 +193,8 @@
             type: 'pie',
             data: {
                 labels: [
-                    `Dentro do Prazo (${((stats.dentro/stats.totalValido)*100 || 0).toFixed(1)}%)`,
-                    `Fora do Prazo (${((stats.fora/stats.totalValido)*100 || 0).toFixed(1)}%)`
+                    `Dentro do Prazo (${((stats.dentro / stats.totalValido) * 100 || 0).toFixed(1)}%)`,
+                    `Fora do Prazo (${((stats.fora / stats.totalValido) * 100 || 0).toFixed(1)}%)`
                 ],
                 datasets: [{ 
                     data: [stats.dentro, stats.fora], 
@@ -206,6 +207,13 @@
                 plugins: { title: { display: true, text: 'Pontualidade (%)' } }
             }
         });
+    }
+
+    function resetFilters() {
+        document.getElementById('filterForn').value = "todos";
+        document.getElementById('dateStart').value = "";
+        document.getElementById('dateEnd').value = "";
+        applyFilters();
     }
 
     init();

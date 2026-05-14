@@ -37,6 +37,8 @@
         .badge { padding: 5px 10px; border-radius: 12px; color: white; font-weight: bold; font-size: 10px; text-transform: uppercase; display: inline-block; }
         .bg-dentro { background: var(--gray-status); }
         .bg-fora { background: var(--red-status); }
+        
+        .txt-atraso { color: var(--red-status); font-weight: bold; }
     </style>
 </head>
 <body>
@@ -89,6 +91,7 @@
                     <th>FORNECEDOR</th>
                     <th>ROTA</th>
                     <th>VIAGEM</th>
+                    <th>TEMPO ATRASO</th>
                     <th>STATUS</th>
                 </tr>
             </thead>
@@ -102,6 +105,22 @@
     let rawData = [];
     let barChartInstance = null;
     let pieChartInstance = null;
+
+    // Converte formato HH:MM da planilha para exibição limpa em minutos ou horas
+    function formatarTempoAtraso(tempoStr) {
+        if (!tempoStr || !tempoStr.includes(':')) return '';
+        
+        const partes = tempoStr.split(':');
+        const horas = parseInt(partes[0], 10) || 0;
+        const minutos = parseInt(partes[1], 10) || 0;
+        
+        if (horas === 0 && minutos === 0) return '';
+        if (horas === 0) {
+            return `${minutos} min`;
+        } else {
+            return `${horas} h ${minutos} min`;
+        }
+    }
 
     function parseAnyDate(dateStr) {
         if (!dateStr) return null;
@@ -142,6 +161,7 @@
                     forn: c[3]?.replace(/"/g, '').trim(),
                     rota: c[4]?.replace(/"/g, '').trim(),
                     viagem: c[6]?.replace(/"/g, '').trim(),
+                    atrasoOriginal: c[10]?.replace(/"/g, '').trim(), // Mapeado para a coluna K (Horário do desvio)
                     status: statusOriginal
                 };
             }).filter(item => item && item.forn && item.status);
@@ -194,11 +214,15 @@
                         if (isDentro) barMap[label].dentro++;
                         if (isFora) barMap[label].fora++;
 
+                        // Regra: se for Fora do Prazo, exibe convertido. Se for Dentro, fica vazio.
+                        const textoAtraso = isFora ? formatarTempoAtraso(row.atrasoOriginal) : '';
+
                         tbody.innerHTML += `<tr>
                             <td>${row.dataOriginal}</td>
                             <td>${row.forn}</td>
                             <td>${row.rota}</td>
                             <td>${row.viagem}</td>
+                            <td class="txt-atraso">${textoAtraso}</td>
                             <td><span class="badge ${isDentro ? 'bg-dentro' : 'bg-fora'}">${row.status}</span></td>
                         </tr>`;
                     }

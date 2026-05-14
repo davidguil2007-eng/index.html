@@ -71,7 +71,7 @@
 
 <header>
     <div class="header-title-container">
-        <h1>Painel de Controle de Coletas</h1>
+        <h1>COLETAS</h1>
         <button class="btn-header-refresh" id="btnAtualizarPlanilha" onclick="init()">
             🔄 Atualizar
         </button>
@@ -101,12 +101,18 @@
                 <option value="FORA">SOMENTE FORA DO PRAZO</option>
             </select>
         </div>
-        <button class="btn-filtrar" onclick="processData()">FILTRAR TELA</button>
+        <button class="btn-filtrar" onclick="processData()">ATUALIZAR FILTROS</button>
     </div>
 
     <div class="stats-grid">
-        <div class="card"><h3>Total Analisado</h3><p id="kpiTotal">0</p></div>
-        <div class="card"><h3>Eficiência do Filtro</h3><p id="kpiEficiencia">0%</p></div>
+        <div class="card">
+            <h3>Total Analisado</h3>
+            <p id="kpiTotal">0</p>
+        </div>
+        <div class="card">
+            <h3>Eficiência do Filtro</h3>
+            <p id="kpiEficiencia">0%</p>
+        </div>
     </div>
 
     <div class="charts-grid">

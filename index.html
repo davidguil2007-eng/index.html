@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+    <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Horse - Versão Final</title>
+    <title>Dashboard Horse - Versão Final Corrigida</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a1a2e; --bg: #f4f7f6; --gray-status: #808080; --red-status: #e63946; }
@@ -95,15 +95,24 @@
     let rawData = [];
     let barChart, pieChart;
 
-    // Converte "30-Apr" para data real
-    function parseExcelDate(dateStr) {
+    // Converte datas como "30-Apr" ou "14/05/2026" para o formato do navegador
+    function parseAnyDate(dateStr) {
         if (!dateStr) return null;
+        
+        // Se já tiver barras (14/05/2026), inverte para ISO
+        if (dateStr.includes('/')) {
+            const p = dateStr.split('/');
+            return `${p[2]}-${p[1]}-${p[0]}`;
+        }
+
+        // Se for formato hifenizado (30-Apr)
         const months = { 'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12' };
         const parts = dateStr.split('-');
         if (parts.length < 2) return null;
+        
         const day = parts[0].padStart(2, '0');
         const month = months[parts[1]] || '01';
-        return `2026-${month}-${day}`; // Assume 2026 conforme image_9fbf99.png
+        return `2026-${month}-${day}`; // Força 2026 como ano base
     }
 
     async function init() {
@@ -115,7 +124,7 @@
             const c = r.split(',');
             return {
                 dataOriginal: c[0]?.trim(),
-                dataIso: parseExcelDate(c[0]?.trim()),
+                dataIso: parseAnyDate(c[0]?.trim()),
                 forn: c[3]?.replace(/"/g, '').trim(),
                 rota: c[4]?.trim(),
                 viagem: c[6]?.trim(),
@@ -143,16 +152,23 @@
 
         rawData.forEach(row => {
             const matchForn = selForn === "ALL" || row.forn === selForn;
-            const matchDate = (!dStart || !dEnd) || (row.dataIso >= dStart && row.dataIso <= dEnd);
             
+            // Lógica de Data robusta
+            let matchDate = true;
+            if (dStart && dEnd && row.dataIso) {
+                matchDate = (row.dataIso >= dStart && row.dataIso <= dEnd);
+            }
+
             if (matchForn && matchDate) {
                 const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO");
                 const isFora = row.status.includes("FORA") || row.status.includes("ATRASADO");
 
-                // Filtro de Status para os KPIs e Gráficos
-                const skipPorStatus = (selStatus === "DENTRO" && !isDentro) || (selStatus === "FORA" && !isFora);
+                // Filtro por categoria (Dentro ou Fora)
+                const passStatusFilter = (selStatus === "AMBOS") || 
+                                       (selStatus === "DENTRO" && isDentro) || 
+                                       (selStatus === "FORA" && isFora);
 
-                if ((isDentro || isFora) && !skipPorStatus) {
+                if ((isDentro || isFora) && passStatusFilter) {
                     if (isDentro) stats.dentro++;
                     if (isFora) stats.fora++;
 
@@ -170,31 +186,48 @@
             }
         });
 
-        updateUI(barMap, stats);
+        updateUI(barMap, stats, selStatus);
     }
 
-    function updateUI(barMap, stats) {
+    function updateUI(barMap, stats, filterMode) {
         const total = stats.dentro + stats.fora;
         document.getElementById('kpiTotal').innerText = total;
-        document.getElementById('kpiEficiencia').innerText = total > 0 ? ((stats.dentro / total) * 100).toFixed(1) + "%" : "0%";
+
+        // Eficiência baseada na seleção
+        let efVal = 0;
+        if (total > 0) {
+            if (filterMode === "FORA") efVal = 0; // Se filtrou fora, a "eficiência" de estar no prazo é 0
+            else if (filterMode === "DENTRO") efVal = 100; // Se filtrou dentro, é 100%
+            else efVal = (stats.dentro / total) * 100;
+        }
+        document.getElementById('kpiEficiencia').innerText = efVal.toFixed(1) + "%";
 
         if (barChart) barChart.destroy();
         if (pieChart) pieChart.destroy();
 
+        // Gráfico de Barras com as cores do filtro
         barChart = new Chart(document.getElementById('barChart'), {
             type: 'bar',
             data: {
                 labels: Object.keys(barMap),
-                datasets: [{ label: 'Qtd Viagens', data: Object.values(barMap), backgroundColor: '#1a1a2e' }]
+                datasets: [{ 
+                    label: 'Viagens Filtradas', 
+                    data: Object.values(barMap), 
+                    backgroundColor: filterMode === "FORA" ? '#e63946' : (filterMode === "DENTRO" ? '#808080' : '#1a1a2e') 
+                }]
             },
             options: { responsive: true, maintainAspectRatio: false }
         });
 
+        // Gráfico de Pizza dinâmico
         pieChart = new Chart(document.getElementById('pieChart'), {
             type: 'pie',
             data: {
                 labels: [`Dentro (${stats.dentro})`, `Fora (${stats.fora})`],
-                datasets: [{ data: [stats.dentro, stats.fora], backgroundColor: ['#808080', '#e63946'] }]
+                datasets: [{ 
+                    data: [stats.dentro, stats.fora], 
+                    backgroundColor: ['#808080', '#e63946'] 
+                }]
             },
             options: { responsive: true, maintainAspectRatio: false }
         });

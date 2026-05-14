@@ -6,7 +6,7 @@
     <title>Painel de Controle de Coletas</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
-        :root { --primary: #1a1a2e; --bg: #f4f7f6; --green-status: #2ec4b6; --gray-status: #808080; --red-status: #e63946; }
+        :root { --primary: #1a1a2e; --bg: #f4f7f6; --gray-status: #808080; --red-status: #e63946; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; }
         header { background: var(--primary); color: white; padding: 1.5rem 1rem; text-align: center; }
         header h1 { margin: 0; font-size: 24px; letter-spacing: 1px; }
@@ -34,7 +34,6 @@
         th { text-align: left; padding: 12px; background: #f8f9fa; border-bottom: 2px solid #eee; font-size: 12px; color: #666; }
         td { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; color: #333; }
         .badge { padding: 5px 10px; border-radius: 12px; color: white; font-weight: bold; font-size: 10px; text-transform: uppercase; display: inline-block; }
-        .bg-antecipado { background: var(--green-status); }
         .bg-dentro { background: var(--gray-status); }
         .bg-fora { background: var(--red-status); }
     </style>
@@ -63,9 +62,9 @@
         <div class="filter-group">
             <label>Status Pontualidade</label>
             <select id="statusSelect">
-                <option value="AMBOS">TODOS OS STATUS</option>
-                <option value="DENTRO">SOMENTE DENTRO / ANTECIPADO</option>
-                <option value="FORA">SOMENTE FORA DO PRAZO</option>
+                <option value="AMBOS">DENTRO + FORA</option>
+                <option value="DENTRO">SOMENTE DENTRO</option>
+                <option value="FORA">SOMENTE FORA</option>
             </select>
         </div>
         <button onclick="processData()">ATUALIZAR FILTROS</button>
@@ -103,7 +102,6 @@
     let barChartInstance = null;
     let pieChartInstance = null;
 
-    // Converte os padrões de data encontrados na coluna A da planilha ("30-Apr" ou "dd/mm/aaaa")
     function parseAnyDate(dateStr) {
         if (!dateStr) return null;
         
@@ -135,7 +133,7 @@
                     forn: c[3]?.replace(/"/g, '').trim(),
                     rota: c[4]?.trim(),
                     viagem: c[6]?.trim(),
-                    status: c[9]?.replace(/"/g, '').trim().toUpperCase() // Coluna J/K contendo o status de prazo
+                    status: c[9]?.replace(/"/g, '').trim().toUpperCase()
                 };
             }).filter(item => item.forn && item.status);
 
@@ -155,8 +153,8 @@
         const dStart = document.getElementById('dtStart').value;
         const dEnd = document.getElementById('dtEnd').value;
 
-        // Contadores dinâmicos reiniciados do zero a cada execução
-        let stats = { antecipado: 0, dentro: 0, fora: 0 };
+        // Contadores limpos para o cálculo dinâmico baseado no filtro
+        let stats = { dentro: 0, fora: 0 };
         let barMap = {};
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = "";
@@ -170,34 +168,27 @@
             }
 
             if (matchForn && matchDate) {
-                const isAntecipado = row.status.includes("ANTECIPADO");
-                const isDentro = row.status.includes("DENTRO DO PRAZO") || row.status.includes("NO PRAZO");
-                const isFora = row.status.includes("FORA DO PRAZO") || row.status.includes("ATRASADO");
+                const isDentro = row.status.includes("DENTRO");
+                const isFora = row.status.includes("FORA");
 
-                if (isAntecipado || isDentro || isFora) {
-                    // Mapeamento lógico do select de status
+                if (isDentro || isFora) {
                     const passStatus = (selStatus === "AMBOS") || 
-                                       (selStatus === "DENTRO" && (isDentro || isAntecipado)) || 
+                                       (selStatus === "DENTRO" && isDentro) || 
                                        (selStatus === "FORA" && isFora);
 
                     if (passStatus) {
-                        if (isAntecipado) stats.antecipado++;
                         if (isDentro) stats.dentro++;
                         if (isFora) stats.fora++;
 
                         const label = selForn === "ALL" ? row.forn : row.dataOriginal;
                         barMap[label] = (barMap[label] || 0) + 1;
 
-                        let classBadge = 'bg-dentro';
-                        if (isAntecipado) classBadge = 'bg-antecipado';
-                        if (isFora) classBadge = 'bg-fora';
-
                         tbody.innerHTML += `<tr>
                             <td>${row.dataOriginal}</td>
                             <td>${row.forn}</td>
                             <td>${row.rota}</td>
                             <td>${row.viagem}</td>
-                            <td><span class="badge ${classBadge}">${row.status}</span></td>
+                            <td><span class="badge ${isDentro ? 'bg-dentro' : 'bg-fora'}">${row.status}</span></td>
                         </tr>`;
                     }
                 }
@@ -208,23 +199,20 @@
     }
 
     function updateUI(barMap, stats, filterMode) {
-        const totalFiltro = stats.antecipado + stats.dentro + stats.fora;
+        const totalFiltro = stats.dentro + stats.fora;
         document.getElementById('kpiTotal').innerText = totalFiltro;
 
-        // Cálculo exato de eficiência baseado na junção de Antecipados + No Prazo sobre o total filtrado
         let efVal = 0;
         if (totalFiltro > 0) {
             if (filterMode === "FORA") efVal = 0;
             else if (filterMode === "DENTRO") efVal = 100;
-            else efVal = ((stats.antecipado + stats.dentro) / totalFiltro) * 100;
+            else efVal = (stats.dentro / totalFiltro) * 100;
         }
         document.getElementById('kpiEficiencia').innerText = efVal.toFixed(1) + "%";
 
-        // Destruição de gráficos antigos para impedir dados sobrepostos
         if (barChartInstance) barChartInstance.destroy();
         if (pieChartInstance) pieChartInstance.destroy();
 
-        // Cores correspondentes
         let barColor = '#1a1a2e';
         if (filterMode === "DENTRO") barColor = '#808080';
         if (filterMode === "FORA") barColor = '#e63946';
@@ -243,19 +231,13 @@
             options: { responsive: true, maintainAspectRatio: false }
         });
 
-        // Configuração matemática estrita das fatias da pizza conforme o Total Analisado
+        // Montagem do Gráfico de Pizza com Porcentagem Real e Proporcional
         const ctxPie = document.getElementById('pieChart').getContext('2d');
         let pieLabels = [];
         let pieData = [];
         let pieColors = [];
 
         if (filterMode === "AMBOS" || filterMode === "DENTRO") {
-            if(stats.antecipado > 0 || filterMode === "DENTRO") {
-                const pctAnt = totalFiltro > 0 ? ((stats.antecipado / totalFiltro) * 100).toFixed(1) : 0;
-                pieLabels.push(`Antecipado: ${stats.antecipado} (${pctAnt}%)`);
-                pieData.push(stats.antecipado);
-                pieColors.push('#2ec4b6');
-            }
             if(stats.dentro > 0 || filterMode === "DENTRO") {
                 const pctDen = totalFiltro > 0 ? ((stats.dentro / totalFiltro) * 100).toFixed(1) : 0;
                 pieLabels.push(`Dentro do Prazo: ${stats.dentro} (${pctDen}%)`);

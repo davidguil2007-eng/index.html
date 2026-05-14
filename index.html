@@ -9,21 +9,30 @@
         :root { --primary: #1a1a2e; --bg: #f4f7f6; --gray-status: #808080; --red-status: #e63946; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; }
         
-        /* Ajustes no Header para alinhar o título e o botão disfarçado */
-        header { background: var(--primary); color: white; padding: 1.5rem 1rem; text-align: center; position: relative; }
-        .header-title-container { display: flex; align-items: center; justify-content: center; gap: 15px; }
+        /* Ajuste do Header para mandar o botão para a extrema direita */
+        header { 
+            background: var(--primary); 
+            color: white; 
+            padding: 1.5rem 2rem; 
+            display: flex;
+            align-items: center;
+            justify-content: space-between; /* Empurra os textos para a esquerda/centro e o botão para a ponta direita */
+        }
+        .header-text {
+            text-align: left; /* Deixa os textos alinhados à esquerda de forma organizada */
+        }
         header h1 { margin: 0; font-size: 24px; letter-spacing: 1px; text-transform: uppercase; }
         header p { margin: 5px 0 0; font-size: 14px; opacity: 0.8; }
         
-        /* O botão disfarçado com o fundo do cabeçalho */
+        /* Botão 100% disfarçado no canto superior direito */
         .btn-header-refresh {
             background: var(--primary);
-            color: rgba(255, 255, 255, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: rgba(255, 255, 255, 0.7); /* Texto levemente transparente para ficar bem discreto */
+            border: 1px solid rgba(255, 255, 255, 0.15);
             border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
-            height: 32px;
+            height: 34px;
             padding: 0 15px;
             font-size: 11px;
             text-transform: uppercase;
@@ -31,9 +40,11 @@
             display: inline-flex;
             align-items: center;
             gap: 6px;
+            white-space: nowrap; /* Evita que o texto quebre em duas linhas */
         }
         .btn-header-refresh:hover {
             background: #252542;
+            color: rgba(255, 255, 255, 1);
             border-color: rgba(255, 255, 255, 0.4);
         }
 
@@ -70,13 +81,14 @@
 <body>
 
 <header>
-    <div class="header-title-container">
-        <h1>COLETAS</h1>
-        <button class="btn-header-refresh" id="btnAtualizarPlanilha" onclick="init()">
-            🔄 Atualizar
-        </button>
+    <div class="header-text">
+        <h1>PAINEL DE CONTROLE DE COLETAS</h1>
+        <p>Monitoramento Logístico em Tempo Real</p>
     </div>
-    <p>Monitoramento Logístico em Tempo Real</p>
+    
+    <button class="btn-header-refresh" id="btnAtualizarPlanilha" onclick="init()">
+        🔄 Atualizar
+    </button>
 </header>
 
 <div class="container">

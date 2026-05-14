@@ -3,66 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Horse - Controle de Pontualidade</title>
+    <title>Dashboard Horse - Versão Final</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root { --primary: #1a1a2e; --bg: #f4f7f6; --gray-status: #808080; --red-status: #e63946; }
         body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; }
-        header { background: var(--primary); color: white; padding: 1.5rem; text-align: center; }
-        .container { padding: 20px; max-width: 1200px; margin: auto; }
+        header { background: var(--primary); color: white; padding: 1rem; text-align: center; }
+        .container { padding: 20px; max-width: 1300px; margin: auto; }
         
-        /* Filtros */
         .filter-card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 15px; align-items: flex-end; justify-content: center; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
         .filter-group { display: flex; flex-direction: column; gap: 5px; }
-        label { font-size: 12px; font-weight: bold; color: #555; }
-        select, input { padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
-        button { padding: 9px 20px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        label { font-size: 11px; font-weight: bold; color: #555; text-transform: uppercase; }
+        select, input { padding: 8px; border-radius: 6px; border: 1px solid #ccc; min-width: 140px; }
+        
+        button { padding: 10px 25px; background: var(--primary); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
 
-        /* KPIs */
         .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-        .card { background: white; padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
-        .card p { margin: 5px 0 0; font-size: 28px; font-weight: bold; color: var(--primary); }
+        .card { background: white; padding: 25px; border-radius: 12px; text-align: center; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .card h3 { margin: 0; font-size: 16px; color: #333; }
+        .card p { margin: 10px 0 0; font-size: 32px; font-weight: 800; color: var(--primary); }
 
-        /* Gráficos */
         .charts-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 20px; margin-bottom: 20px; }
         .chart-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); min-height: 400px; }
 
-        /* Tabela */
-        .table-container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow-x: auto; }
+        .table-container { background: white; padding: 20px; border-radius: 12px; overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; padding: 12px; background: #eee; font-size: 13px; }
+        th { text-align: left; padding: 12px; background: #f8f9fa; border-bottom: 2px solid #eee; }
         td { padding: 10px; border-bottom: 1px solid #eee; font-size: 13px; }
-        
-        .badge { padding: 5px 10px; border-radius: 12px; color: white; font-weight: bold; font-size: 11px; text-transform: uppercase; }
+        .badge { padding: 5px 10px; border-radius: 12px; color: white; font-weight: bold; font-size: 10px; }
         .bg-dentro { background: var(--gray-status); }
         .bg-fora { background: var(--red-status); }
-        .bg-ignorar { background: #ddd; color: #777; }
     </style>
 </head>
 <body>
 
-<header><h1>DASHBOARD DE PONTUALIDADE</h1></header>
+<header><h1>DASHBOARD LOGÍSTICO HORSE</h1></header>
 
 <div class="container">
     <div class="filter-card">
         <div class="filter-group">
-            <label>FORNECEDOR</label>
+            <label>Fornecedor</label>
             <select id="fornSelect"><option value="ALL">TODOS</option></select>
         </div>
         <div class="filter-group">
-            <label>DATA INÍCIO</label>
+            <label>Data Início</label>
             <input type="date" id="dtStart">
         </div>
         <div class="filter-group">
-            <label>DATA FIM</label>
+            <label>Data Fim</label>
             <input type="date" id="dtEnd">
+        </div>
+        <div class="filter-group">
+            <label>Status Pontualidade</label>
+            <select id="statusSelect">
+                <option value="AMBOS">DENTRO + FORA</option>
+                <option value="DENTRO">SOMENTE DENTRO</option>
+                <option value="FORA">SOMENTE FORA</option>
+            </select>
         </div>
         <button onclick="processData()">ATUALIZAR FILTROS</button>
     </div>
 
     <div class="stats-grid">
-        <div class="card"><h3>Total Analisado (Dentro + Fora)</h3><p id="kpiTotal">0</p></div>
-        <div class="card"><h3>Eficiência Atual</h3><p id="kpiEficiencia">0%</p></div>
+        <div class="card"><h3>Total Analisado</h3><p id="kpiTotal">0</p></div>
+        <div class="card"><h3>Eficiência do Filtro</h3><p id="kpiEficiencia">0%</p></div>
     </div>
 
     <div class="charts-grid">
@@ -91,6 +95,17 @@
     let rawData = [];
     let barChart, pieChart;
 
+    // Converte "30-Apr" para data real
+    function parseExcelDate(dateStr) {
+        if (!dateStr) return null;
+        const months = { 'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12' };
+        const parts = dateStr.split('-');
+        if (parts.length < 2) return null;
+        const day = parts[0].padStart(2, '0');
+        const month = months[parts[1]] || '01';
+        return `2026-${month}-${day}`; // Assume 2026 conforme image_9fbf99.png
+    }
+
     async function init() {
         const res = await fetch(URL);
         const csv = await res.text();
@@ -99,7 +114,8 @@
         rawData = rows.map(r => {
             const c = r.split(',');
             return {
-                data: c[0]?.trim(),
+                dataOriginal: c[0]?.trim(),
+                dataIso: parseExcelDate(c[0]?.trim()),
                 forn: c[3]?.replace(/"/g, '').trim(),
                 rota: c[4]?.trim(),
                 viagem: c[6]?.trim(),
@@ -116,6 +132,7 @@
 
     function processData() {
         const selForn = document.getElementById('fornSelect').value;
+        const selStatus = document.getElementById('statusSelect').value;
         const dStart = document.getElementById('dtStart').value;
         const dEnd = document.getElementById('dtEnd').value;
 
@@ -125,45 +142,38 @@
         tbody.innerHTML = "";
 
         rawData.forEach(row => {
-            // LÓGICA DO FILTRO DE DATA
-            let matchDate = true;
-            if (dStart && dEnd) {
-                const parts = row.data.split('/'); // DD/MM/AAAA
-                const dateObj = `${parts[2]}-${parts[1]}-${parts[0]}`; // AAAA-MM-DD
-                matchDate = dateObj >= dStart && dateObj <= dEnd;
-            }
-
             const matchForn = selForn === "ALL" || row.forn === selForn;
+            const matchDate = (!dStart || !dEnd) || (row.dataIso >= dStart && row.dataIso <= dEnd);
+            
+            if (matchForn && matchDate) {
+                const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO");
+                const isFora = row.status.includes("FORA") || row.status.includes("ATRASADO");
 
-            if (matchDate && matchForn) {
-                let badge = "bg-ignorar";
-                
-                // CONSIDERA APENAS DENTRO E FORA
-                if (row.status.includes("DENTRO DO PRAZO") || row.status.includes("NO PRAZO")) {
-                    stats.dentro++;
-                    badge = "bg-dentro";
-                } else if (row.status.includes("FORA DO PRAZO") || row.status.includes("ATRASADO")) {
-                    stats.fora++;
-                    badge = "bg-fora";
+                // Filtro de Status para os KPIs e Gráficos
+                const skipPorStatus = (selStatus === "DENTRO" && !isDentro) || (selStatus === "FORA" && !isFora);
+
+                if ((isDentro || isFora) && !skipPorStatus) {
+                    if (isDentro) stats.dentro++;
+                    if (isFora) stats.fora++;
+
+                    const label = selForn === "ALL" ? row.forn : row.dataOriginal;
+                    barMap[label] = (barMap[label] || 0) + 1;
+
+                    tbody.innerHTML += `<tr>
+                        <td>${row.dataOriginal}</td>
+                        <td>${row.forn}</td>
+                        <td>${row.rota}</td>
+                        <td>${row.viagem}</td>
+                        <td><span class="badge ${isDentro ? 'bg-dentro' : 'bg-fora'}">${row.status}</span></td>
+                    </tr>`;
                 }
-
-                const key = selForn === "ALL" ? row.forn : row.data;
-                barMap[key] = (barMap[key] || 0) + 1;
-
-                tbody.innerHTML += `<tr>
-                    <td>${row.data}</td>
-                    <td>${row.forn}</td>
-                    <td>${row.rota}</td>
-                    <td>${row.viagem}</td>
-                    <td><span class="badge ${badge}">${row.status}</span></td>
-                </tr>`;
             }
         });
 
-        updateCharts(barMap, stats);
+        updateUI(barMap, stats);
     }
 
-    function updateCharts(barMap, stats) {
+    function updateUI(barMap, stats) {
         const total = stats.dentro + stats.fora;
         document.getElementById('kpiTotal').innerText = total;
         document.getElementById('kpiEficiencia').innerText = total > 0 ? ((stats.dentro / total) * 100).toFixed(1) + "%" : "0%";
@@ -175,7 +185,7 @@
             type: 'bar',
             data: {
                 labels: Object.keys(barMap),
-                datasets: [{ label: 'Viagens', data: Object.values(barMap), backgroundColor: '#1a1a2e' }]
+                datasets: [{ label: 'Qtd Viagens', data: Object.values(barMap), backgroundColor: '#1a1a2e' }]
             },
             options: { responsive: true, maintainAspectRatio: false }
         });
@@ -183,20 +193,10 @@
         pieChart = new Chart(document.getElementById('pieChart'), {
             type: 'pie',
             data: {
-                labels: [
-                    `Dentro do Prazo (${total > 0 ? ((stats.dentro/total)*100).toFixed(1) : 0}%)`,
-                    `Fora do Prazo (${total > 0 ? ((stats.fora/total)*100).toFixed(1) : 0}%)`
-                ],
-                datasets: [{
-                    data: [stats.dentro, stats.fora],
-                    backgroundColor: ['#808080', '#e63946']
-                }]
+                labels: [`Dentro (${stats.dentro})`, `Fora (${stats.fora})`],
+                datasets: [{ data: [stats.dentro, stats.fora], backgroundColor: ['#808080', '#e63946'] }]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                plugins: { title: { display: true, text: 'PONTUALIDADE (%)' } }
-            }
+            options: { responsive: true, maintainAspectRatio: false }
         });
     }
 

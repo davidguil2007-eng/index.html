@@ -97,23 +97,26 @@
 </div>
 
 <script>
-    const URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSet_MSL2I0uUFX4Fwa_0WSIJAeOiyRC5eS_kXFGn0JEJqPKaIKPSPghTlSM0suGCZ_hZD-e_ZM-NEW/pub?gid=0&single=true&output=csv;
+    const URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSet_MSL2I0uUFX4Fwa_0WSIJAeOiyRC5eS_kXFGn0JEJqPKaIKPSPghTlSM0suGCZ_hZD-e_ZM-NEW/pub?gid=0&single=true&output=csv';
     let rawData = [];
     let barChartInstance = null;
     let pieChartInstance = null;
 
+    // Função auxiliar para dividir a linha do CSV respeitando aspas e vírgulas internas
+    function splitCSVLine(line) {
+        const matches = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+        return matches.map(val => val.replace(/^"|"$////g, '').trim());
+    }
+
     function parseAnyDate(dateStr) {
         if (!dateStr) return null;
-        
         if (dateStr.includes('/')) {
             const p = dateStr.split('/');
-            return `${p[2]}-${p[1]}-${p[0]}`;
+            return `${p[2]}-${p[1].padStart(2, '0')}-${p[0].padStart(2, '0')}`;
         }
-
         const months = { 'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04', 'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12' };
         const parts = dateStr.split('-');
         if (parts.length < 2) return null;
-        
         const day = parts[0].padStart(2, '0');
         const month = months[parts[1]] || '01';
         return `2026-${month}-${day}`;
@@ -122,28 +125,34 @@
     async function init() {
         try {
             const res = await fetch(URL);
+            if (!res.ok) throw new Error("Link da planilha inacessível.");
+            
             const csv = await res.text();
             const rows = csv.split('\n').slice(1);
             
             rawData = rows.map(r => {
-                const c = r.split(',');
+                // Usa a nova função de divisão robusta
+                const c = r.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/); 
+                
                 return {
-                    dataOriginal: c[0]?.trim(),
-                    dataIso: parseAnyDate(c[0]?.trim()),
+                    dataOriginal: c[0]?.replace(/"/g, '').trim(),
+                    dataIso: parseAnyDate(c[0]?.replace(/"/g, '').trim()),
                     forn: c[3]?.replace(/"/g, '').trim(),
-                    rota: c[4]?.trim(),
-                    viagem: c[6]?.trim(),
+                    rota: c[4]?.replace(/"/g, '').trim(),
+                    viagem: c[6]?.replace(/"/g, '').trim(),
                     status: c[9]?.replace(/"/g, '').trim().toUpperCase()
                 };
             }).filter(item => item.forn && item.status);
 
             const forns = [...new Set(rawData.map(d => d.forn))].sort();
             const select = document.getElementById('fornSelect');
+            select.innerHTML = '<option value="ALL">TODOS</option>';
             forns.forEach(f => select.innerHTML += `<option value="${f}">${f}</option>`);
 
             processData();
         } catch (e) {
-            console.error("Erro ao carregar dados da planilha:", e);
+            console.error("Erro no carregamento:", e);
+            alert("Erro ao ler os dados. Se as tabelas continuarem sumidas, verifique se a planilha está publicada na Web em Arquivo > Compartilhar > Publicar na Web.");
         }
     }
 
@@ -159,20 +168,17 @@
         tbody.innerHTML = "";
 
         rawData.forEach(row => {
-            if (row.status.includes("ANTECIPADO")) {
-                return; 
-            }
+            if (row.status.includes("ANTECIPADO")) return; 
 
             const matchForn = selForn === "ALL" || row.forn === selForn;
-            
             let matchDate = true;
             if (dStart && dEnd && row.dataIso) {
                 matchDate = (row.dataIso >= dStart && row.dataIso <= dEnd);
             }
 
             if (matchForn && matchDate) {
-                const isDentro = row.status.includes("DENTRO DO PRAZO") || row.status.includes("NO PRAZO") || row.status === "DENTRO";
-                const isFora = row.status.includes("FORA DO PRAZO") || row.status.includes("ATRASADO") || row.status === "FORA";
+                const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO");
+                const isFora = row.status.includes("FORA") || row.status.includes("ATRASADO");
 
                 if (isDentro || isFora) {
                     const passStatus = (selStatus === "AMBOS") || 
@@ -185,10 +191,7 @@
 
                         const label = selForn === "ALL" ? row.forn : row.dataOriginal;
                         
-                        // Inicializa a estrutura para permitir a separação de cores na barra
-                        if (!barMap[label]) {
-                            barMap[label] = { dentro: 0, fora: 0 };
-                        }
+                        if (!barMap[label]) barMap[label] = { dentro: 0, fora: 0 };
                         if (isDentro) barMap[label].dentro++;
                         if (isFora) barMap[label].fora++;
 
@@ -222,7 +225,6 @@
         if (barChartInstance) barChartInstance.destroy();
         if (pieChartInstance) pieChartInstance.destroy();
 
-        // Configuração do Gráfico de Barras Empilhado com cores sincronizadas com a Pizza
         const ctxBar = document.getElementById('barChart').getContext('2d');
         const labels = Object.keys(barMap);
         const dataDentro = labels.map(l => barMap[l].dentro);
@@ -233,33 +235,19 @@
             data: {
                 labels: labels,
                 datasets: [
-                    {
-                        label: 'Dentro do Prazo',
-                        data: dataDentro,
-                        backgroundColor: '#808080' // Cinza
-                    },
-                    {
-                        label: 'Fora do Prazo',
-                        data: dataFora,
-                        backgroundColor: '#e63946' // Vermelho
-                    }
+                    { label: 'Dentro do Prazo', data: dataDentro, backgroundColor: '#808080' },
+                    { label: 'Fora do Prazo', data: dataFora, backgroundColor: '#e63946' }
                 ]
             },
             options: { 
                 responsive: true, 
                 maintainAspectRatio: false,
-                scales: {
-                    x: { stacked: true },
-                    y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } }
-                }
+                scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, ticks: { stepSize: 1 } } }
             }
         });
 
-        // Configuração estrita do gráfico de pizza
         const ctxPie = document.getElementById('pieChart').getContext('2d');
-        let pieLabels = [];
-        let pieData = [];
-        let pieColors = [];
+        let pieLabels = []; let pieData = []; let pieColors = [];
 
         if (filterMode === "AMBOS" || filterMode === "DENTRO") {
             if(stats.dentro > 0 || filterMode === "DENTRO") {
@@ -280,20 +268,8 @@
 
         pieChartInstance = new Chart(ctxPie, {
             type: 'pie',
-            data: {
-                labels: pieLabels,
-                datasets: [{
-                    data: pieData,
-                    backgroundColor: pieColors
-                }]
-            },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: true, position: 'top' }
-                }
-            }
+            data: { labels: pieLabels, datasets: [{ data: pieData, backgroundColor: pieColors }] },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'top' } } }
         });
     }
 

@@ -143,7 +143,7 @@
 
             processData();
         } catch (e) {
-            console.error("Erro ao processar inicialização dos dados:", e);
+            console.error("Erro ao carregar dados da planilha:", e);
         }
     }
 
@@ -153,13 +153,17 @@
         const dStart = document.getElementById('dtStart').value;
         const dEnd = document.getElementById('dtEnd').value;
 
-        // Contadores limpos para o cálculo dinâmico baseado no filtro
         let stats = { dentro: 0, fora: 0 };
         let barMap = {};
         const tbody = document.getElementById('tableBody');
         tbody.innerHTML = "";
 
         rawData.forEach(row => {
+            // REMOVE COMPLETAMENTE O ANTECIPADO DO SISTEMA
+            if (row.status.includes("ANTECIPADO")) {
+                return; 
+            }
+
             const matchForn = selForn === "ALL" || row.forn === selForn;
             
             let matchDate = true;
@@ -168,8 +172,8 @@
             }
 
             if (matchForn && matchDate) {
-                const isDentro = row.status.includes("DENTRO");
-                const isFora = row.status.includes("FORA");
+                const isDentro = row.status.includes("DENTRO") || row.status.includes("NO PRAZO");
+                const isFora = row.status.includes("FORA") || row.status.includes("ATRASADO");
 
                 if (isDentro || isFora) {
                     const passStatus = (selStatus === "AMBOS") || 
@@ -231,7 +235,6 @@
             options: { responsive: true, maintainAspectRatio: false }
         });
 
-        // Montagem do Gráfico de Pizza com Porcentagem Real e Proporcional
         const ctxPie = document.getElementById('pieChart').getContext('2d');
         let pieLabels = [];
         let pieData = [];
